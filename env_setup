@@ -1,0 +1,3 @@
+#! /bin/sh
+export AVRLIB_INCLUDE_PATH=`pwd`/include
+export AVRLIB_SOURCE_PATH=`pwd`/source

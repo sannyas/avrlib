@@ -1,0 +1,146 @@
+#include "pdiusbd12_usb.h"
+#include <avr/pgmspace.h>
+#include <stdio.h>
+
+const prog_uchar device_desc[] = {
+	0x12,
+	0x01,
+	0x10,
+	0x01,
+	0x00,
+	0x00,
+	0x00,
+	0x10,
+	0x88,
+	0x88,
+	0x01,
+	0x00,
+	0x00,
+	0x01,
+	0x01,
+	0x02,
+	0x03,
+	0x01
+};
+
+const prog_uchar config_set[] = {
+	0x09,
+	0x02,
+	34,
+	0,
+	0x01,
+	0x01,
+	0x00,
+	0x80,
+	0x32,
+	0x09,
+	0x04,
+	0x00,
+	0x00,
+	0x01,
+	0x03,
+	0x01,
+	0x02,
+	0x00,
+	0x09,
+	0x21,
+	0x10,
+	0x01,
+	0x21,
+	0x01,
+	0x22,
+	52, // size of report descriptor
+	0x00,
+	0x07,
+	0x05,
+	0x81,
+	0x03,
+	0x10,
+	0x00,
+	0x0a,
+};
+
+const prog_uchar lang_id[] = {
+	0x04,	// length
+	0x03,	// type=0x03
+	0x09,	// id ...
+	0x04,
+};
+
+const prog_uchar str_desc[] = {
+	10,
+	0x03,
+	'h', 0,
+	'e', 0,
+	'h', 0,
+	'e', 0,
+};
+
+const prog_uchar report_desc[] = {
+	0x05, 0x01,
+	0x09, 0x02,
+	0xa1, 0x01,
+	0x09, 0x01,
+	0xa1, 0x00,
+	0x05, 0x09,
+	0x19, 0x01,
+	0x29, 0x03,
+	0x15, 0x00,
+	0x25, 0x01,
+	0x95, 0x03,
+	0x75, 0x01,
+	0x81, 0x02,
+	0x95, 0x01,
+	0x75, 0x05,
+	0x81, 0x03, 
+	0x05, 0x01,
+	0x09, 0x30,
+	0x09, 0x31,
+	0x09, 0x38, 
+	0x15, 0x81,
+	0x25, 0x7f,
+	0x75, 0x08,
+	0x95, 0x03,
+	0x81, 0x06,
+	0xc0,
+	0xc0,
+};
+
+extern uint8_t d12_fillDescriptor( uint8_t type, uint8_t idx, uint8_t *data, uint8_t pos, uint8_t max_len ){
+	const prog_uchar *ptr;
+	uint8_t len;
+	uint8_t i;
+
+	printf( "fill, type=%d, idx=%d, data=0x%x, pos=%d, max_len=%d\n", type,idx,(uint16_t)data,pos,max_len );
+
+	if( type == SEND_TYPE_DEVICE ){	// Device Descriptor
+		len = sizeof(device_desc) - pos; // Max len
+		ptr = device_desc;
+	}
+	else if( type == SEND_TYPE_CONFIG_SET ){ // Configuration Descriptor
+		len = sizeof( config_set ) - pos;
+		ptr = config_set;
+	}
+	else if( type == SEND_TYPE_LANG_ID ){ // Language ID
+		len = sizeof( lang_id ) - pos;
+		ptr = lang_id;
+	}		
+	else if( type == SEND_TYPE_STRING ){ // String Descriptor
+		len = sizeof( str_desc ) - pos;
+		ptr = str_desc;
+	}
+	else if( type = SEND_TYPE_REPORT ){
+		len = sizeof( report_desc ) - pos;
+		ptr = str_desc;
+	}
+
+	if( len > max_len )
+		len = max_len;
+	
+	for( i=0; i<len; ++i ){
+		data[i] = pgm_read_byte( ptr+i+pos );
+		printf( "%x ",pgm_read_byte(ptr+i+pos) );
+	}
+	printf( "\n" );
+	return len;
+}

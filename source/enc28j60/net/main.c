@@ -1,0 +1,50 @@
+#include <util/delay.h>
+#include <enc28j60.h>
+#include <usart.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <debug.h>
+#include "ixrip.h"
+
+/* For debug */
+DEBUG_INIT();
+
+uint8_t pack_send[] = {
+	0xff,0xff,0xff,0xff,0xff,0xff,
+	0x22,0x22,0x22,0x22,0x22,0x22,
+	0x08,0x06,
+	0x00,0x01,
+	0x08,0x00,
+	0x06,0x04,
+	0x00,0x01,
+	0x22,0x22,0x22,0x22,0x22,0x22,
+	0xc0,0xa8,0x01,200,
+	0x00,0x00,0x00,0x00,0x00,0x00,
+	0xc0,0xa8,0x01,250
+};
+uint8_t mac_addr[] = {
+	0x22,0x22,0x22,0x22,0x22,0x22 };
+uint8_t ip_addr[] = {
+	192,168,1,200
+};
+
+int main( void ){
+	uint16_t len;
+
+	usart_init( );
+	stdout = &usart_file;
+	printf( "main start\n" );
+
+	enc28j60_init( mac_addr );
+	ixrip_setMac( mac_addr );
+	ixrip_setIp( ip_addr );
+
+	while( 1 ){
+		len = enc28j60_receivePacket( buff.bytes, IXRIP_BUFFER_LEN );
+		if( len > 0 ){
+			printf( "receive a package, len = %d\n", len );
+			ethernet_handle( );
+		}
+	}
+	return 0;
+}

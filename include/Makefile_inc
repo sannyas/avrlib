@@ -1,0 +1,341 @@
+AVRDUDE = avrdude -c usbasp -p $(DEVICE) -U flash:w:$(TARGET_NAME).hex
+AVRDUDE_RESET = avrdude -c usbasp -p $(DEVICE) -E reset
+
+######################################################################
+# Configurable items :                                               #
+# These items shouldn't be used directly, unless you clearly         #
+# understand them.                                                   #
+#   CHECK_ENV_VARIABLE = [true]|false                                #
+#   VERBOSE_OUTPUT = [false]true                                     #
+#   BUILD_MODULE [false]|true                                        #
+######################################################################
+
+
+######################################################################
+# Tool chain for building                                            #
+######################################################################
+
+CC      = avr-gcc
+AR      = avr-ar
+OBJCOPY = avr-objcopy
+OBJDUMP = avr-objdump
+SIZE    = avr-size
+NM      = avr-nm
+	
+
+######################################################################
+# The option of tool chain                                           #
+######################################################################
+# Optimization level (0, 1, 2, 3, 4 or s)
+OPTIMIZE = s
+# C Standard level (c89, gnu89, c99 or gnu99)
+CSTD = gnu89
+# Warning contorls
+WARNINGS = all extra
+DEBUG	= # dwarf-2
+
+
+######################################################################
+#                                                                    #
+#           DO NOT MODIFY                                            #
+#                                                                    #
+######################################################################
+
+
+######################################################################
+# Set default configurable item                                      #
+######################################################################
+ifneq ($(BUILD_MODULE),true)
+    BUILD_MODULE = false
+endif
+ifndef ($(CHECK_ENV_VARIABLE),false)
+    CHECK_ENV_VARIABLE = true
+endif
+ifndef ($(VERBOSE_OUTPUT),true)
+    VERBOSE_OUTPUT = false
+endif
+
+######################################################################
+# Set output directory                                               #
+# All generated files will be saved in the BUILDDIE folder.          #
+# If this environment variable is not specified, current             #
+# dir is default.                                                    #
+######################################################################
+
+ifeq ($(origin BUILDDIR),environment)
+    override BUILDDIR := $(shell if [ ! -d $(BUILDDIR) ];\
+	    then mkdir -p $(BUILDDIR);fi;cd $(BUILDDIR);pwd)
+    export BUILDDIR
+else
+ifeq ($(origin BUILDDIR),undefined)
+    BUILDDIR = $(shell pwd)
+    export BUILDDIR
+endif
+endif
+
+######################################################################
+# Check some necessary variable.                                     #
+# AVRLIB_INCLUDE_PATH and AVRLIB_SOURCE_PATH must be defined.        #
+######################################################################
+
+ifneq ($(CHECK_ENV_VARIABLE),false)
+    ENV_VARIABLE_ALL = AVRLIB_INCLUDE_PATH \
+		       AVRLIB_SOURCE_PATH
+    ERROR_ITEM = $(foreach item,$(ENV_VARIABLE_ALL),\
+		 $(if $($(item)),,$(item)))
+    ifneq ($(strip $(ERROR_ITEM)),)
+        $(error "Env variables( $(ERROR_ITEM)) need to be set")
+    endif
+endif
+
+ifeq ($(DEVICE),)
+  $(error "DEVICE need to be defined" )
+endif
+ifeq ($(F_CPU),)
+  $(error "F_CPU need to be defined" )
+endif
+
+
+# add DEVICE & F_CPU in to LIB_CONFS
+
+######################################################################
+# Check configuration for building module
+######################################################################
+
+ifeq ($(BUILD_MODULE),true)
+    ERROR_ITEM = $(foreach item,$(LIB_CONFS),$(if $($(item)),,\
+		 $(item)))
+    ifneq ($(strip $(ERROR_ITEM)),)
+        $(error "build module $(TARGET) --> Need to be defined:\
+		$(ERROR_ITEM)")
+    endif
+endif
+
+
+######################################################################
+# Check configuration for building project
+######################################################################
+
+ifeq ($(BUILD_MODULE),false)
+    ERROR_ITEM = $(foreach item,$(PRJ_CONFS),$(if $($(item)),,\
+		 $(item)))
+    ifneq ($(strip $(ERROR_ITEM)),)
+        $(error "build project --> Need to be defined: \
+		$(ERROR_ITEM)")
+    endif
+endif
+
+
+
+
+######################################################################
+# Get all OBJ file names                                             #
+######################################################################
+
+ifeq ($(TARGET_TYPE),lib)
+LIB_COBJ =  $(LIB_CSRC:.c=.o) 
+LIB_AOBJ =  $(LIB_ASRC:.S=.o)
+LIB_COBJ := $(addprefix $(BUILDDIR)/,$(LIB_COBJ))
+LIB_AOBJ := $(addprefix $(BUILDDIR)/,$(LIB_AOBJ))
+else
+ifeq ($(TARGET_TYPE),prj)
+PRJ_COBJ =  $(PRJ_CSRC:.c=.o)
+PRJ_AOBJ =  $(PRJ_ASRC:.S=.o)
+PRJ_COBJ := $(addprefix $(BUILDDIR)/,$(PRJ_COBJ))
+endif
+endif
+
+
+
+######################################################################
+# Modules                                                            #
+######################################################################
+
+ifeq ($(TARGET_TYPE),lib)
+LIB_MODULE_NAMES = $(subst .,,$(suffix $(subst /,.,$(addprefix .,$(LIB_MODULES)))))
+LIB_MODULE_PATHS = $(addsuffix .a,$(addprefix lib,$(LIB_MODULE_NAMES)))
+LIB_MODULE_PATHS := $(addprefix $(BUILDDIR)/,$(LIB_MODULE_PATHS))
+else
+ifeq ($(TARGET_TYPE),prj)
+PRJ_MODULE_NAMES = $(subst .,,$(suffix $(subst /,.,$(addprefix .,$(PRJ_MODULES)))))
+PRJ_MODULE_PATHS = $(addsuffix .a,$(addprefix lib,$(PRJ_MODULE_NAMES)))
+PRJ_MODULE_PATHS := $(addprefix $(BUILDDIR)/,$(PRJ_MODULE_LIBS))
+endif
+endif
+
+
+######################################################################
+# Defines                                                            #
+######################################################################
+LIB_DEFS += $(foreach name,$(LIB_CONFS),$(name)=$($(name)))
+PRJ_DEFS += $(foreach name,$(PRJ_CONFS),$(name)=$($(name)))
+ifeq ($(BUILD_MODULE),false)
+export PRJ_DEFS
+endif
+DEFS = $(LIB_DEFS) $(PRJ_DEFS)
+DEFS += DEVICE=$(DEVICE) F_CPU=$(F_CPU)
+
+
+######################################################################
+# Flags for C files                                                  #
+######################################################################
+
+CFLAGS += -fdata-sections -ffunction-sections
+CFLAGS += -Wno-deprecated-declarations -D__PROG_TYPES_COMPAT__
+CFLAGS += -Wl,--gc-sections
+CFLAGS += -Wall
+CFLAGS += -std=$(CSTD)
+#CFLAGS += -g$(DEBUG)
+CFLAGS += -mmcu=$(DEVICE)
+CFLAGS += -O$(OPTIMIZE) -mcall-prologues
+CFLAGS += $(addprefix -W,$(WARNINGS))
+CFLAGS += $(addprefix -I,$(AVRLIB_INCLUDE_PATH))
+CFLAGS += $(addprefix -D,$(DEFS)) -DAVRLIB
+#CFLAGS += -Wp,-M,-MP,-MT,$(BUILDDIR)/$(*F).o,-MF,$(BUILDDIR)/$(*F).d
+
+
+######################################################################
+# Assemble flags                                                     #
+######################################################################
+ASFLAGS += $(addprefix -D,$(ADEFS)) -Wa,-gstabs,-g$(DEBUG)
+ALL_ASFLAGS = -mmcu=$(DEVICE) -I. -x assembler-with-cpp $(ASFLAGS) -fdata-sections -ffunction-sections
+
+
+# Linker flags
+LDFLAGS += -Wl,-lm -Wl,--gc-sections,-Map,$(TARGET_NAME).map
+
+# target.
+ifeq ($(TARGET_TYPE),lib)
+target: lib
+	@echo "target lib"
+else
+ifeq ($(TARGET_TYPE),prj)
+target: version prj_modules elf hex lst sym bin size
+	@echo "target prj"
+else
+target:
+	@echo "No target"
+endif
+endif
+
+lib: lib_modules $(BUILDDIR)/lib$(TARGET_NAME).a
+	@echo "--> " lib$(TARGET_NAME).a
+	@echo
+	
+TARGET_WITH_PATH = $(BUILDDIR)/$(TARGET_NAME)
+hex: $(TARGET_WITH_PATH).hex
+bin: $(TARGET_WITH_PATH).bin
+elf: prj_modules $(TARGET_WITH_PATH).elf
+lst: $(TARGET_WITH_PATH).lst 
+sym: $(TARGET_WITH_PATH).sym
+
+# Create modules
+ifneq ($(LIB_MODULES),)
+lib_modules:
+	@echo
+	@echo build modules for library $(TARGET_NAME) ...
+	@echo 
+	@for item in $(addprefix $(AVRLIB_SOURCE_PATH)/,$(LIB_MODULES)); \
+	do\
+		if [ -d $$item ]; then \
+		cd $$item; BUILD_MODULE=true make;\
+		else echo "*** Directory $$item is not exist" \
+		fi \
+	done
+else
+lib_modules:
+endif
+
+ifneq ($(PRJ_MODULES),)
+prj_modules:
+	
+	@echo
+	@echo build module for target $(TARGET_NAME) ...
+	@echo
+	@for item in $(addprefix $(AVRLIB_SOURCE_PATH)/,$(PRJ_MODULES)); \
+	do\
+		if [ -d $$item ]; then \
+		cd $$item; BUILD_MODULE=true make;\
+		else echo "*** Directory $$item is not exist"; \
+		fi \
+	done
+else
+prj_modules:
+endif
+
+# Create library
+%.a: $(LIB_AOBJ) $(LIB_COBJ)
+	@echo "--> " $@
+	@$(AR) rcs $@ $^
+
+# Display compiler version information.
+version :
+	@$(CC) --version
+
+# Create final output file (.hex or .bin) from ELF output file.
+%.hex: %.elf
+	@echo "-->"$@
+	@$(OBJCOPY) -O ihex $< $@
+
+%.bin: %.elf
+	@echo "-->"$@
+	@$(OBJCOPY) -O binary $< $@
+
+# Create extended listing file from ELF output file.
+%.lst: %.elf
+	@echo "-->"$@
+	@$(OBJDUMP) -h -S -C $< > $@
+
+# Create a symbol table from ELF output file.
+%.sym: %.elf
+	@echo -->$@
+	@$(NM) -n $< > $@
+
+# Display size of file.
+size:
+	@echo
+	@$(SIZE) -C --mcu=$(DEVICE) $(TARGET_WITH_PATH).elf
+
+# Link: create ELF output file from object files.
+%.elf:  $(PRJ_AOBJ) $(PRJ_COBJ) $(PRJ_MODULE_PATHS)
+	@echo
+	@echo Linking...
+	@echo 
+	@echo "--> " $@
+	@$(CC) $(LDFLAGS) $(CFLAGS) $(PRJ_AOBJ) $(PRJ_COBJ) -L$(BUILDDIR) $(addprefix -l,$(PRJ_MODULE_NAMES)) --output $@
+
+# Compile: create object files from C source files. ARM or Thumb(-2)
+$(LIB_COBJ) $(PRJ_COBJ) : $(BUILDDIR)/%.o : %.c
+	@echo "--> " $@
+	@$(CC) -c $(CFLAGS) $< -o $@
+
+# Assemble: create object files from assembler source files. ARM or Thumb(-2)
+$(LIB_AOBJ) $(PRJ_AOBJ) : $(BUILDDIR)/%.o : %.S
+	@echo "--> " $@
+	@$(CC) -c $(ALL_ASFLAGS) $< -o $@
+
+
+# Target: clean project.
+clean:
+	@echo
+	rm -f $(BUILDDIR)/*.a
+	rm -f $(BUILDDIR)/*.o
+	rm -f $(BUILDDIR)/*.hex
+	rm -f $(BUILDDIR)/*.sym
+	rm -f $(BUILDDIR)/*.elf
+	rm -f $(BUILDDIR)/*.lst
+	rm -f $(BUILDDIR)/*.d
+	rm -f $(BUILDDIR)/*.map
+	rm -f $(BUILDDIR)/*.bin
+
+
+# Include the dependency files.
+-include $(shell mkdir $(BUILDDIR) 2>/dev/null) $(wildcard $(BUILDDIR)/*.d)
+
+upload:
+	@echo
+	$(AVRDUDE) 
+reset:
+	$(AVRDUDE_RESET)
+
+

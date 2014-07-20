@@ -1,0 +1,2 @@
+cd tx; make clean; make; sudo make upload; 
+cd ../rasp-test; make; sudo ./nrf24l01p

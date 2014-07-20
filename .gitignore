@@ -1,0 +1,13 @@
+*.a
+*.o
+*.hex
+*.sym
+*.elf
+*.lst
+*.d
+*.bin
+*~
+*.swp
+tmp/
+tags
+*.ign

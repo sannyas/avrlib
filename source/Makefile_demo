@@ -1,0 +1,29 @@
+# Configuration Requested
+#
+
+# The name of target. The final generated file is named this.
+TARGET_NAME = name
+# Target type, lib or prj
+TARGET_TYPE = type
+
+# For lib
+## The needed C file to compile this target.
+LIB_CSRC = xxx.c
+## The needed ASM file to compile this target.
+LIB_ASRC = xxx.S
+## Dependent module
+LIB_MODULES = xxx
+## defines
+LIB_DEFS = xxx
+## The configuration of this module
+LIB_CONFS = xxx
+
+# For prj
+PRJ_CSRC = xxx.c
+PRJ_ASRC = xxx.S
+PRJ_MODULES = xxx
+PRJ_DEFS = xxx
+PRJ_CONFS = xxx
+
+# main Makefile
+include $(AVRLIB_INCLUDE_PATH)/Makefile_inc
